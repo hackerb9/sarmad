@@ -1,0 +1,65 @@
+#!/bin/bash
+# Set the backlight brightness on all displays to follow what is set by a
+# laptop's builtin keys and brightness tools such as Gnome's slider.
+# It does this by reading /sys/class/backlight/*/brightness.
+# 
+# If setting backlight fails, falls back to adjusting brightness in software.
+#
+# This tool is especially useful on a laptop plugged into an external monitor.
+
+# Written by hackerb9, 2019
+# Inspired by a post by Sarmad Khalid Abdullah <sarmad@alusus.org>.
+# https://github.com/pop-os/pop/issues/73#issuecomment-381296708
+
+blacklist="none"		# Optional xrandr outputs to NOT change. (Regex)
+# Examples:	blacklist="eDP-1"
+#		blacklist="eDP-1|eDP-2|eDP-3|eDP-4"
+# 	     	blacklist="eDP-"	(equivalent to "eDP-1|eDP-2|...etc")
+# 	     	blacklist="^DP"		(matches DP-1, but not eDP-1)
+
+if ! type inotifywait >/dev/null; then
+    echo "This program requires inotifywait. Please install inotify-tools.">&2
+    exit 1
+fi
+
+backlightdir=$(ls -1d /sys/class/backlight/*)
+if [[ -z "$backlightdir" ]]; then
+    echo "Error. No existing backlight on this computer to follow." >&2
+    exit 1
+fi
+if [[ $(echo "$backlightdir" | wc -l) -gt 1 ]]; then
+    echo "Oops. More than one backlight detected." >&2
+    echo "$backlightdir" |cat -n >&2
+    backlightdir=$(echo "$backlightdir" | head -1)
+    echo "Hoping “$(basename "$backlightdir")” is the right one." >&2
+fi
+
+declare -i max=$(<"$backlightdir/max_brightness")
+level="$backlightdir/brightness"
+factor=$(echo | awk "{print $max/100}")
+
+blevel() {
+    local -i l=$(<$level)
+    l=l*100/max
+    echo $l
+}
+bfloat() {
+    echo | awk "{print $(<$level) / $max}"
+}
+
+bset() {
+    for output in $(xrandr --current | awk '$2 == "connected" {print $1}'); do
+	if [[ $output =~ $blacklist ]]; then continue; fi
+	xrandr --output $output --set Backlight $(blevel) 2>/dev/null ||
+	    xrandr --output $output --brightness $(bfloat)
+    done
+}
+
+bset
+inotifywait -mqe modify $level | while read; do
+    bset
+done
+
+
+# "Once I was bathed in the Light of Truth within..."
+# 		—Sarmad Kashani, 1661 CE
