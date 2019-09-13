@@ -11,6 +11,7 @@
 # Inspired by a post by Sarmad Khalid Abdullah <sarmad@alusus.org>.
 # https://github.com/pop-os/pop/issues/73#issuecomment-381296708
 
+usegamma=yes			# "yes" to attempt to maintain contrast.
 blacklist="none"		# Optional xrandr outputs to NOT change. (Regex)
 # Examples:	blacklist="eDP-1"
 #		blacklist="eDP-1|eDP-2|eDP-3|eDP-4"
@@ -46,12 +47,19 @@ blevel() {
 bfloat() {
     echo | awk "{print $(<$level) / $max}"
 }
+bgamma() {
+    # As brightness is lowered in software, the screen can lose contrast.
+    # A fix is to darken midtones before the brightest pixels.
+    if [[ $usegamma != "yes" ]]; then return; fi
+    g=$(echo | awk "{print ( $(<$level) / $max / 2)+0.5}")
+    echo "--gamma $g:$g:$g"
+}
 
 bset() {
     for output in $(xrandr --current | awk '$2 == "connected" {print $1}'); do
 	if [[ $output =~ $blacklist ]]; then continue; fi
 	xrandr --output $output --set Backlight $(blevel) 2>/dev/null ||
-	    xrandr --output $output --brightness $(bfloat)
+	    xrandr --output $output --brightness $(bfloat) $(bgamma)
     done
 }
 
