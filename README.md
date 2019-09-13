@@ -6,14 +6,14 @@ your laptop don't work with it? This program solves that problem.
 
 Sarmad sets the brightness on *all* displays to follow what is set by
 builtin keys and typical tools such as Gnome's brightness slider.  It
-does this by reading values set in /sys/class/backlight/*/brightness.
+does this by reading values set in `/sys/class/backlight/*/brightness`.
 Sarmad then uses xrandr to attempt to set every display's backlight
 directly. If that fails (for example, with HDMI connections) it uses
 xrandr to adjust brightness in software.
 
 ## Installation
 
-It's just a shell script, so just
+It's a shell script, so just
 [download it](https://github.com/hackerb9/sarmad/raw/master/sarmad),
 mark it executable, and put it in your path. 
 ```
@@ -24,7 +24,7 @@ sudo mv sarmad /usr/local/bin/sarmad
 
 ## Usage
 
-Just run `sarmad` and then hit your brightness keys.
+Run `sarmad` in the background and then hit your brightness keys.
 
 To have it automatically start at login, run it in the background from
 `~/.xsessionrc`.
@@ -40,8 +40,9 @@ laptops. It reads the current brightness level from the file
 `/sys/class/backlight/*/brightness`. 
 
 If you don't have that, then you'll want to use a different tool, such
-as binding a keyboard shortcut to run `xbacklight +10` or using
-`acpi_listen` to detect brightness up and down key strokes.
+as binding a keyboard shortcut to run my 
+[brightness script](https://github.com/hackerb9/brightness). You can also try 
+`xbacklight +10` or using `acpi_listen` to detect special brightness up and down keys.
 
 The reason I went with this odd, indirect way is so that other
 backlight control tools, particularly Gnome's brightness slider, would
