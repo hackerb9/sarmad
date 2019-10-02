@@ -28,32 +28,32 @@ reset() {
 }
 trap reset exit
 
-verbose() { [[ "$vflag" ]] && echo "$@" >&2 ; }
-if [[ "$1" == "-v" ]]; then vflag="yup"; shift; fi
-if [[ "$1" == "-x" ]]; then set -x; shift; fi
+setup() {
+    verbose() { [[ "$vflag" ]] && echo "$@" >&2 ; }
+    if [[ "$1" == "-v" ]]; then vflag="yup"; shift; fi
+    if [[ "$1" == "-x" ]]; then set -x; shift; fi
 
+    if ! type inotifywait >/dev/null; then
+	echo "This program requires inotifywait. Please install inotify-tools.">&2
+	exit 1
+    fi
 
-if ! type inotifywait >/dev/null; then
-    echo "This program requires inotifywait. Please install inotify-tools.">&2
-    exit 1
-fi
+    backlightdir=$(ls -1d /sys/class/backlight/*)
+    if [[ -z "$backlightdir" ]]; then
+	echo "Error. No existing backlight on this computer to follow." >&2
+	exit 1
+    fi
+    if [[ $(echo "$backlightdir" | wc -l) -gt 1 ]]; then
+	echo "Oops. More than one backlight detected." >&2
+	echo "$backlightdir" |cat -n >&2
+	backlightdir=$(echo "$backlightdir" | head -1)
+	echo "Hoping “$(basename "$backlightdir")” is the right one." >&2
+    fi
 
-backlightdir=$(ls -1d /sys/class/backlight/*)
-if [[ -z "$backlightdir" ]]; then
-    echo "Error. No existing backlight on this computer to follow." >&2
-    exit 1
-fi
-if [[ $(echo "$backlightdir" | wc -l) -gt 1 ]]; then
-    echo "Oops. More than one backlight detected." >&2
-    echo "$backlightdir" |cat -n >&2
-    backlightdir=$(echo "$backlightdir" | head -1)
-    echo "Hoping “$(basename "$backlightdir")” is the right one." >&2
-fi
-
-declare -i max=$(<"$backlightdir/max_brightness")
-level="$backlightdir/brightness"
-factor=$(echo | awk "{print $max/100}")
-
+    declare -gi max=$(<"$backlightdir/max_brightness")
+    declare -g  level="$backlightdir/brightness"
+    declare -g  factor=$(echo | awk "{print $max/100}")
+}
 blevel() {
     local -i l=$(<$level)
     l=l*100/max
@@ -75,19 +75,23 @@ bset() {
 	if [[ $output =~ $blacklist ]]; then continue; fi
  	if ! xrandr --output $output --set Backlight $(blevel) 2>/dev/null; then
 	    xrandr --output $output --brightness $(bfloat) $(bgamma) &&
-		verbose "Successfully set brightness to $(bfloat) (gamma $(bgamma)) for $output"
+		verbose "Successfully set brightness to $(bfloat) $(bgamma) for $output"
 	else	    
 	    verbose "Successfully set backlight to $(blevel) for $output"
 	fi
     done
 }
 
-bset
-inotifywait -mqe modify $level | while read; do
-    verbose "Now processing: '$REPLY'"
+main() {
     bset
-done
+    inotifywait -mqe modify $level | while read; do
+	verbose "Now processing: '$REPLY'"
+	bset
+    done
+}
 
+setup "$@"
+main
 
 # "Once I was bathed in the Light of Truth within..."
 # 		—Sarmad Kashani, 1661 CE
